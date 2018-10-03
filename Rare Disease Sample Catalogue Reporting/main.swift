@@ -8,5 +8,15 @@
 
 import Foundation
 
-print("Hello, World!")
+struct Resources {
+    let sampleCatalogueEndpoint: URL = "https://samples.rd-connect.eu/api/v2/RD_connect_Sample?aggs=x==Disease"
 
+}
+
+
+let ols = OntologyLookupService()
+ols.ready.wait()
+print("Vertices: \(ols.vertices.count) Edges: \(ols.edges.count)")
+//ols.edges.forEach { (edge) in
+//    print("\(edge.source) \(edge.label) \(edge.target)")
+//}
