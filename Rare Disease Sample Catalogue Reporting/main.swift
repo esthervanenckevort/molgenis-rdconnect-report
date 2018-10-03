@@ -16,7 +16,16 @@ struct Resources {
 
 let ols = OntologyLookupService()
 ols.ready.wait()
+
 print("Vertices: \(ols.vertices.count) Edges: \(ols.edges.count)")
-//ols.edges.forEach { (edge) in
-//    print("\(edge.source) \(edge.label) \(edge.target)")
-//}
+let group = ols.vertices.filter { (vertex) -> Bool in
+    return vertex.iri == "http://www.orpha.net/ORDO/Orphanet_377794"
+}
+let groups = ols.edges.filter { (vertex) -> Bool in
+    return vertex.target == "http://www.orpha.net/ORDO/Orphanet_377794"
+}
+print(groups.map { (edge) -> String in
+    let vertex = ols.findVertex(with: edge.source)
+    return vertex?.label ?? "\(edge.source) does not exist"
+})
+

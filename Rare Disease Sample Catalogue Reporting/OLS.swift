@@ -76,8 +76,14 @@ class OntologyLookupService {
     let decode = JSONDecoder()
     let ready: DispatchSemaphore
     let queue = DispatchQueue(label: "update")
+    let session: URLSession
 
     init() {
+        let config = URLSessionConfiguration.default
+        config.httpMaximumConnectionsPerHost = 5
+        config.urlCache = URLCache(memoryCapacity: 100_000_000, diskCapacity: 1_000_000_000, diskPath: "/tmp/orphanet.cache")
+        config.httpAdditionalHeaders = ["Accept": "application/json"]
+        session = URLSession(configuration: config)
         ready = DispatchSemaphore(value: 0)
         vertices = Set<Node>()
         edges = Set<Edge>()
@@ -86,11 +92,14 @@ class OntologyLookupService {
         get(url: components.url!, completion: initializeVertices)
     }
 
+    func findVertex(with iri: URL) -> Node? {
+        return vertices.first(where: { (node) -> Bool in
+            return node.iri == iri
+        })
+    }
+
     private func get(url: URL, completion: @escaping (Data) -> ()) {
-        print(url.absoluteString)
-        var request = URLRequest(url: url)
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        URLSession.shared.dataTask(with: request) {data, request, errors in
+        session.dataTask(with: url) {data, request, errors in
             guard let data = data else { fatalError(errors?.localizedDescription ?? "Unexpected condition") }
             completion(data)
         }.resume()
@@ -120,10 +129,12 @@ class OntologyLookupService {
             charset.formUnion(CharacterSet(charactersIn: "_"))
             let uri = edge.iri.absoluteString.addingPercentEncoding(withAllowedCharacters: charset)!
             let graphURL = olsEndPoint.appendingPathComponent(uri).appendingPathComponent("graph")
-            var request = URLRequest(url: graphURL)
-            request.addValue("application/json", forHTTPHeaderField: "Accept")
-            URLSession.shared.dataTask(with: request) {data, request, errors in
-                guard let data = data else { fatalError(errors?.localizedDescription ?? "Unexpected condition") }
+            session.dataTask(with: graphURL) {data, request, error in
+                guard let data = data else {
+                    print("Failed to load edges for \(graphURL) \(error?.localizedDescription ?? "Unexpected condition")")
+                    group.leave()
+                    return
+                }
                 do {
                     let result = try self.decode.decode(Graph.self, from: data)
                     self.queue.async {
@@ -132,7 +143,8 @@ class OntologyLookupService {
                         group.leave()
                     }
                 } catch let error {
-                    fatalError(error.localizedDescription)
+                    print("Failed to load edges for \(graphURL) \(error.localizedDescription)")
+                    group.leave()
                 }
             }.resume()
         }
@@ -140,7 +152,6 @@ class OntologyLookupService {
             defer {
                 self.ready.signal()
             }
-//            _ = group.wait(wallTimeout: .now() + .seconds(5))
             group.wait()
         }
     }
