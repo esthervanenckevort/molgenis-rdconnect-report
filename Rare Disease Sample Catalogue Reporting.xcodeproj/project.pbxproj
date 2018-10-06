@@ -10,6 +10,7 @@
 		631BBFE1216544A9000DBB01 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 631BBFE0216544A9000DBB01 /* main.swift */; };
 		631BBFE821654800000DBB01 /* URL+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 631BBFE721654800000DBB01 /* URL+Extensions.swift */; };
 		631BBFEC216552B9000DBB01 /* OLS.swift in Sources */ = {isa = PBXBuildFile; fileRef = 631BBFEB216552B9000DBB01 /* OLS.swift */; };
+		6331BBDE216928DE00C234E1 /* Samples.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6331BBDD216928DE00C234E1 /* Samples.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -29,6 +30,7 @@
 		631BBFE0216544A9000DBB01 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		631BBFE721654800000DBB01 /* URL+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+Extensions.swift"; sourceTree = "<group>"; };
 		631BBFEB216552B9000DBB01 /* OLS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OLS.swift; sourceTree = "<group>"; };
+		6331BBDD216928DE00C234E1 /* Samples.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Samples.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,6 +66,7 @@
 				631BBFE0216544A9000DBB01 /* main.swift */,
 				631BBFE721654800000DBB01 /* URL+Extensions.swift */,
 				631BBFEB216552B9000DBB01 /* OLS.swift */,
+				6331BBDD216928DE00C234E1 /* Samples.swift */,
 			);
 			path = "Rare Disease Sample Catalogue Reporting";
 			sourceTree = "<group>";
@@ -126,6 +129,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				631BBFE1216544A9000DBB01 /* main.swift in Sources */,
+				6331BBDE216928DE00C234E1 /* Samples.swift in Sources */,
 				631BBFEC216552B9000DBB01 /* OLS.swift in Sources */,
 				631BBFE821654800000DBB01 /* URL+Extensions.swift in Sources */,
 			);

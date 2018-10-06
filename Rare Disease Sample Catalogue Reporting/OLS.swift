@@ -10,27 +10,12 @@ import Foundation
 
 class OntologyLookupService {
 
-    struct Page: Codable {
-        var size: Int
-        var totalElements: Int
-        var totalPages: Int
-        var number: Int
-    }
-
     struct Link: Codable {
         var href: URL
     }
 
     struct Links: Codable {
-//        var first: Link
         var next: Link?
-//        var previous: Link?
-//        var last: Link
-//        var this: Link
-//
-//        enum CodingKeys: String, CodingKey {
-//            case first, next, previous, last, this = "self"
-//        }
     }
 
     struct Embedded: Codable {
@@ -40,12 +25,10 @@ class OntologyLookupService {
     struct Terms: Codable {
         var data: Embedded
         var links: Links
-//        var page: Page
 
         enum CodingKeys: String, CodingKey {
             case data = "_embedded"
             case links = "_links"
-//            case page
         }
     }
 
@@ -77,6 +60,7 @@ class OntologyLookupService {
     let ready: DispatchSemaphore
     let queue = DispatchQueue(label: "update")
     let session: URLSession
+    var graph: (nodes: [URL:[Node]], edges: [URL:[Edge]])?
 
     init() {
         let config = URLSessionConfiguration.default
@@ -93,9 +77,21 @@ class OntologyLookupService {
     }
 
     func findVertex(with iri: URL) -> Node? {
-        return vertices.first(where: { (node) -> Bool in
-            return node.iri == iri
-        })
+        return graph?.nodes[iri]?.first
+    }
+
+    func depthFirstSearch(starting iri: URL, shouldTraverse: (Edge) -> Bool) {
+        var seen = [URL]()
+        depthFirstSearch(starting: iri, seen: &seen, shouldTraverse: shouldTraverse)
+    }
+    private func depthFirstSearch(starting iri: URL, seen: inout [URL], shouldTraverse: (Edge) -> Bool) {
+        seen.append(iri)
+        for edge in graph?.edges[iri] ?? [] {
+            guard !seen.contains(edge.target) else { continue }
+            if shouldTraverse(edge) {
+                depthFirstSearch(starting: edge.target, seen: &seen, shouldTraverse: shouldTraverse)
+            }
+        }
     }
 
     private func get(url: URL, completion: @escaping (Data) -> ()) {
@@ -153,6 +149,9 @@ class OntologyLookupService {
                 self.ready.signal()
             }
             group.wait()
+            let nodes = Dictionary<URL, [Node]>(grouping: self.vertices) { return $0.iri }
+            let edges = Dictionary<URL, [Edge]>(grouping: self.edges) { return $0.source }
+            self.graph = (nodes, edges)
         }
     }
 }
