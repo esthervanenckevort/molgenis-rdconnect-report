@@ -9,11 +9,10 @@
 import Foundation
 
 class Samples {
-    let sampleCatalogueEndpoint: URL = "https://samples.rd-connect.eu/api/v2/RD_connect_Sample?aggs=x==Disease"
+    private let sampleCatalogueEndpoint: URL = "https://samples.rd-connect.eu/api/v2/RD_connect_Sample?aggs=x==Disease"
 
     struct Disease: Codable {
         var IRI: String
-//        var description: String
         var preferredTerm: String
         var id: String
         var code: String
@@ -30,14 +29,14 @@ class Samples {
         var aggs: Aggregates
     }
 
-    var decode = JSONDecoder()
+    private var decode = JSONDecoder()
     var aggregates = [URL: Int]()
-    var ready = DispatchSemaphore(value: 0)
 
-    init() {
+    init(_ group: DispatchGroup) {
+        group.enter()
         URLSession.shared.dataTask(with: sampleCatalogueEndpoint) { (data, response, error) in
             defer {
-                self.ready.signal()
+                group.leave()
             }
             guard let data = data else { fatalError("Failed to load aggregates")}
             do {

@@ -53,22 +53,23 @@ class OntologyLookupService {
         var edges: [Edge]
     }
 
-    let olsEndPoint: URL = "https://www.ebi.ac.uk/ols/api/ontologies/ORDO/terms"
-    var vertices: Set<Node>
-    var edges: Set<Edge>
-    let decode = JSONDecoder()
-    let ready: DispatchSemaphore
-    let queue = DispatchQueue(label: "update")
-    let session: URLSession
-    var graph: (nodes: [URL:[Node]], edges: [URL:[Edge]])?
+    private let olsEndPoint: URL = "https://www.ebi.ac.uk/ols/api/ontologies/ORDO/terms"
+    private var vertices: Set<Node>
+    private var edges: Set<Edge>
+    private let decode = JSONDecoder()
+    private let initialisationGroup: DispatchGroup
+    private let queue = DispatchQueue(label: "update")
+    private let session: URLSession
+    private var graph: (nodes: [URL:[Node]], outgoing: [URL:[Edge]], incoming:  [URL:[Edge]])?
 
-    init() {
+    init(_ group: DispatchGroup) {
+        group.enter()
+        self.initialisationGroup = group
         let config = URLSessionConfiguration.default
         config.httpMaximumConnectionsPerHost = 5
         config.urlCache = URLCache(memoryCapacity: 100_000_000, diskCapacity: 1_000_000_000, diskPath: "/tmp/orphanet.cache")
         config.httpAdditionalHeaders = ["Accept": "application/json"]
         session = URLSession(configuration: config)
-        ready = DispatchSemaphore(value: 0)
         vertices = Set<Node>()
         edges = Set<Edge>()
         var components = URLComponents(url: olsEndPoint, resolvingAgainstBaseURL: false)!
@@ -80,18 +81,36 @@ class OntologyLookupService {
         return graph?.nodes[iri]?.first
     }
 
-    func depthFirstSearch(starting iri: URL, shouldTraverse: (Edge) -> Bool) {
-        var seen = [URL]()
-        depthFirstSearch(starting: iri, seen: &seen, shouldTraverse: shouldTraverse)
+    enum Direction {
+        case incoming, outgoing, both
     }
-    private func depthFirstSearch(starting iri: URL, seen: inout [URL], shouldTraverse: (Edge) -> Bool) {
+
+    func depthFirstSearch(starting iri: URL, direction: Direction = .outgoing, shouldTraverse: (Edge) -> Bool) {
+        var seen = [URL]()
+        depthFirstSearch(starting: iri, direction: direction, seen: &seen, shouldTraverse: shouldTraverse)
+    }
+    private func depthFirstSearch(starting iri: URL, direction: Direction, seen: inout [URL], shouldTraverse: (Edge) -> Bool) {
         seen.append(iri)
-        for edge in graph?.edges[iri] ?? [] {
+        for edge in edges(from: iri, direction: direction) {
             guard !seen.contains(edge.target) else { continue }
             if shouldTraverse(edge) {
-                depthFirstSearch(starting: edge.target, seen: &seen, shouldTraverse: shouldTraverse)
+                depthFirstSearch(starting: edge.target, direction: direction, seen: &seen, shouldTraverse: shouldTraverse)
             }
         }
+    }
+
+    private func edges(from iri: URL, direction: Direction) -> [Edge] {
+        var edges = [Edge]()
+        switch direction {
+        case .incoming:
+            edges.append(contentsOf: graph?.incoming[iri] ?? [])
+        case .outgoing:
+            edges.append(contentsOf: graph?.outgoing[iri] ?? [])
+        case .both:
+            edges.append(contentsOf: graph?.incoming[iri] ?? [])
+            edges.append(contentsOf: graph?.outgoing[iri] ?? [])
+        }
+        return edges
     }
 
     private func get(url: URL, completion: @escaping (Data) -> ()) {
@@ -118,9 +137,9 @@ class OntologyLookupService {
     }
 
     private func initializeEdges() {
-        let group = DispatchGroup()
+        let edgeProcessingGroup = DispatchGroup()
         vertices.forEach { (edge) in
-            group.enter()
+            edgeProcessingGroup.enter()
             var charset = CharacterSet.alphanumerics
             charset.formUnion(CharacterSet(charactersIn: "_"))
             let uri = edge.iri.absoluteString.addingPercentEncoding(withAllowedCharacters: charset)!
@@ -128,30 +147,30 @@ class OntologyLookupService {
             session.dataTask(with: graphURL) {data, request, error in
                 guard let data = data else {
                     print("Failed to load edges for \(graphURL) \(error?.localizedDescription ?? "Unexpected condition")")
-                    group.leave()
+                    edgeProcessingGroup.leave()
                     return
                 }
                 do {
                     let result = try self.decode.decode(Graph.self, from: data)
                     self.queue.async {
                         self.edges.formUnion(result.edges)
-                        print("Edges: \(self.edges.count)")
-                        group.leave()
+                        edgeProcessingGroup.leave()
                     }
                 } catch let error {
                     print("Failed to load edges for \(graphURL) \(error.localizedDescription)")
-                    group.leave()
+                    edgeProcessingGroup.leave()
                 }
             }.resume()
         }
         DispatchQueue.global().async {
             defer {
-                self.ready.signal()
+                self.initialisationGroup.leave()
             }
-            group.wait()
+            edgeProcessingGroup.wait()
             let nodes = Dictionary<URL, [Node]>(grouping: self.vertices) { return $0.iri }
-            let edges = Dictionary<URL, [Edge]>(grouping: self.edges) { return $0.source }
-            self.graph = (nodes, edges)
+            let edgesOutgoing = Dictionary<URL, [Edge]>(grouping: self.edges) { return $0.source }
+            let edgesIncoming = Dictionary<URL, [Edge]>(grouping: self.edges) { return $0.target }
+            self.graph = (nodes, edgesOutgoing, edgesIncoming)
         }
     }
 }

@@ -9,28 +9,27 @@
 import Foundation
 
 class Runner {
-    var result: [URL: Int]!
+    var result: [URL: Int]
     var ols: OntologyLookupService
     var samples: Samples
-
+    private let diseaseGroup: URL = "http://www.orpha.net/ORDO/Orphanet_377794"
     init() {
-        samples = Samples()
-        samples.ready.wait()
-        ols = OntologyLookupService()
-        ols.ready.wait()
+        let group = DispatchGroup()
+        samples = Samples(group)
+        ols = OntologyLookupService(group)
+        result = [URL: Int]()
+        group.wait()
     }
 
     func run() {
-        let groups = ols.edges.filter { (vertex) -> Bool in
-            return vertex.target == "http://www.orpha.net/ORDO/Orphanet_377794"
-            }.map { return $0.source }
-
-        result = Dictionary(uniqueKeysWithValues: zip(groups, Array(repeating: 0, count: groups.count)))
+        ols.depthFirstSearch(starting: diseaseGroup, direction: .incoming) { (edge) -> Bool in
+            result[edge.source] = 0
+            return false
+        }
 
         samples.aggregates.forEach { (disease, count) in
-
-            ols.depthFirstSearch(starting: disease) { (edge) -> Bool in
-                if edge.target == "http://www.orpha.net/ORDO/Orphanet_377794" {
+            ols.depthFirstSearch(starting: disease, direction: .outgoing) { (edge) -> Bool in
+                if edge.target == diseaseGroup {
                     print("\(disease) \(edge.source) \(count)")
                     self.result[edge.source] = (self.result[edge.source] ?? 0) + count
                     return false
@@ -43,7 +42,7 @@ class Runner {
 
 let runner = Runner()
 runner.run()
-print(runner.result!.map({ (group, count) -> String in
-    return "\(runner.ols.findVertex(with: group)?.label ?? "")\t\(group)\t\(count)"
+print(runner.result.map({ (group, count) -> String in
+    return "\(runner.ols.findVertex(with: group)?.label ?? "")\t\(group.lastPathComponent)\t\(count)"
 }))
 
