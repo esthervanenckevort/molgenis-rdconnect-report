@@ -8,41 +8,65 @@
 
 import Foundation
 
-class Runner {
-    var result: [URL: Int]
-    var ols: OntologyLookupService
-    var samples: Samples
-    private let diseaseGroup: URL = "http://www.orpha.net/ORDO/Orphanet_377794"
-    init() {
-        let group = DispatchGroup()
-        samples = Samples(group)
-        ols = OntologyLookupService(group)
-        result = [URL: Int]()
-        group.wait()
+let task = DispatchGroup()
+let updates = DispatchGroup()
+let updateQueue = DispatchQueue(label: "Update stats")
+let diseaseGroup: URL = "http://www.orpha.net/ORDO/Orphanet_377794"
+let partOf: URL = "http://purl.obolibrary.org/obo/BFO_0000050"
+let subClassOf: URL = "http://www.w3.org/2000/01/rdf-schema#subClassOf"
+let sampleCatalogue = SampleCatalogue()
+let ols = OntologyLookupService()
+var stats = [URL:Int]()
+task.enter()
+sampleCatalogue.aggregatePerDisease { (result) in
+    defer {
+        task.leave()
     }
-
-    func run() {
-        ols.depthFirstSearch(starting: diseaseGroup, direction: .incoming) { (edge) -> Bool in
-            result[edge.source] = 0
-            return false
-        }
-
-        samples.aggregates.forEach { (disease, count) in
-            ols.depthFirstSearch(starting: disease, direction: .outgoing) { (edge) -> Bool in
-                if edge.target == diseaseGroup {
-                    print("\(disease) \(edge.source) \(count)")
-                    self.result[edge.source] = (self.result[edge.source] ?? 0) + count
-                    return false
+    switch result {
+    case .success(let aggregates):
+        for (counts, disease) in zip(aggregates.matrix, aggregates.xLabels) {
+            guard disease.IRI.starts(with: "urn:miriam:orphanet") else { continue }
+            guard let count = counts.first else {
+                print("No counts for disease \(disease.code)")
+                continue
+            }
+            guard let diseaseURL = URL(string: "http://www.orpha.net/ORDO/Orphanet_\(disease.code)") else {
+                print("Failed to construct URL")
+                continue
+            }
+            do {
+//                print("\(disease.preferredTerm)")
+                try ols.depthFirstSearch(starting: diseaseURL) { (edge) -> Bool in
+                    guard edge.uri == partOf || edge.uri == subClassOf else { return false }
+                    if edge.target == diseaseGroup {
+                        updates.enter()
+                        updateQueue.async {
+//                            print("\(disease.preferredTerm): \(edge.source)")
+                            stats[edge.source, default: 0] += count
+                            updates.leave()
+                        }
+                    }
+                    return edge.target != diseaseGroup
                 }
-                return true
+            } catch {
+                print("Failed to traverse ontology.")
             }
         }
+        updates.wait()
+        print("=== Stats ===")
+        print("Group | Code | Count")
+        print(":-- | :---:  | ---:")
+        stats.sorted { $0.value > $1.value }.forEach { (iri, count) in
+            guard let result = try? ols.node(for: iri), let node = result else {
+                print("Failed to retrieve node for \(iri)")
+                return
+            }
+            print("\(node.label) | \(node.iri.lastPathComponent) | \(count)")
+        }
+    case .error(let error):
+        fatalError(error.localizedDescription)
     }
 }
 
-let runner = Runner()
-runner.run()
-print(runner.result.map({ (group, count) -> String in
-    return "\(runner.ols.findVertex(with: group)?.label ?? "")\t\(group.lastPathComponent)\t\(count)"
-}))
+task.wait()
 
