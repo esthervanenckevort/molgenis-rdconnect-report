@@ -11,22 +11,13 @@ final class rd_catalogue_reportTests: XCTestCase {
         guard #available(macOS 10.13, *) else {
             return
         }
-
-        let fooBinary = productsDirectory.appendingPathComponent("rd_catalogue_report")
-
+        
         let process = Process()
-        process.executableURL = fooBinary
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
+        process.executableURL = productsDirectory.appendingPathComponent("rd-catalogue-report")
 
         try process.run()
         process.waitUntilExit()
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8)
-
-        XCTAssertEqual(output, "Hello, world!\n")
+        XCTAssertEqual(process.terminationStatus, 0)
     }
 
     /// Returns path to the built products directory.
