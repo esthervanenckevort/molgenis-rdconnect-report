@@ -7,7 +7,7 @@
 //
 
 import Foundation
-
+/// see: https://www.ebi.ac.uk/ols/docs/api
 class OntologyLookupService {
 
     class Node: Codable {
