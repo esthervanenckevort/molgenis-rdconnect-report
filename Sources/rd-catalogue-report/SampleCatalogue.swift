@@ -11,7 +11,7 @@ import Foundation
 
 
 class SampleCatalogue {
-    private let sampleCatalogueEndpoint: URL = "https://samples.rd-connect.eu/api/v2/RD_connect_Sample?aggs=x==Disease"
+    private let sampleCatalogueEndpoint: URL = "https://samples.rd-connect.eu/api/v2/rd_connect_Sample?aggs=x==Disease"
 
     struct Aggregates<X>: Decodable where X: Decodable {
         var matrix: [[Int]]
