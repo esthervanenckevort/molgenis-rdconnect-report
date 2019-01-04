@@ -31,42 +31,38 @@ sampleCatalogue.aggregatePerDisease { (result) in
                 continue
             }
             guard let diseaseURL = URL(string: "http://www.orpha.net/ORDO/Orphanet_\(disease.code)") else {
-                print("Failed to construct URL")
+                print("Failed to construct URL for \(disease.code)")
                 continue
             }
             do {
-//                print("\(disease.preferredTerm)")
                 try ols.depthFirstSearch(starting: diseaseURL) { (edge) -> Bool in
                     guard edge.uri == partOf || edge.uri == subClassOf else { return false }
                     if edge.target == diseaseGroup {
                         updates.enter()
                         updateQueue.async {
-//                            print("\(disease.preferredTerm): \(edge.source)")
+                            defer {
+                                updates.leave()
+                            }
                             stats[edge.source, default: 0] += count
-                            updates.leave()
                         }
                     }
                     return edge.target != diseaseGroup
                 }
             } catch {
-                print("Failed to traverse ontology.")
+                print("Failed to traverse ontology starting at \(diseaseURL).")
             }
         }
         updates.wait()
-        print("=== Stats ===")
-        print("Group | Code | Count")
-        print(":-- | :---:  | ---:")
+        print("\"Group\",\"Code\",\"Count\"")
         stats.sorted { $0.value > $1.value }.forEach { (iri, count) in
             guard let result = try? ols.node(for: iri), let node = result else {
                 print("Failed to retrieve node for \(iri)")
                 return
             }
-            print("\(node.label) | \(node.iri.lastPathComponent) | \(count)")
+            print("\"\(node.label)\",\"\(node.iri.lastPathComponent)\",\"\(count)\"")
         }
     case .error(let error):
         fatalError(error.localizedDescription)
     }
 }
-
 task.wait()
-
