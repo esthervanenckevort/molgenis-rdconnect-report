@@ -2,7 +2,7 @@
 //  Samples.swift
 //  Rare Disease Sample Catalogue Reporting
 //
-//  Created by David van Enckevort on 06/10/2018.
+//  Created by Esther van Enckevort on 06/10/2018.
 //  Copyright © 2018 All Things Digital. All rights reserved.
 //
 
@@ -24,16 +24,9 @@ class SampleCatalogue {
 
     private var decoder = JSONDecoder()
 
-    func aggregatePerDisease(completion: @escaping (Result<Aggregates<Disease>>) -> ()) {
-        URLSession.shared.dataTask(with: sampleCatalogueEndpoint) { (data, response, error) in
-            guard let data = data else { fatalError("Failed to load aggregates")}
-            do {
-                let result = try self.decoder.decode(Response<Aggregates<Disease>>.self, from: data)
-                completion(Result.success(result: result.aggs))
-            } catch let exception {
-                completion(Result.error(error: exception))
-            }
-
-        }.resume()
+    func aggregatePerDisease() async throws -> Aggregates<Disease> {
+        let (data, _) = try await URLSession.shared.data(from: sampleCatalogueEndpoint)
+        let result = try decoder.decode(Response<Aggregates<Disease>>.self, from: data)
+        return result.aggs
     }
 }
