@@ -82,12 +82,15 @@ struct Aggregator {
                     if types.contains(where: { $0 == ORDO.inActiveClinicalEntity.rawValue || $0 == ORDO.clinicalEntity.rawValue }) {
                         await statistics.updateUnclassified(url: diseaseURL, count: count)
                     } else {
-                        print("\(disease.preferredTerm) (ORPHA:\(disease.code) is not a clinical entity")
+                        print("\(disease.preferredTerm) (ORPHA:\(disease.code)) is not a clinical entity")
                     }
 
                 } else {
                     for diseaseGroup in diseaseGroups {
                         await statistics.updateGroup(url: diseaseGroup, count: count)
+                        if ORDO.inactive.contains(diseaseGroup) {
+                            printMessage(disease: disease, group: diseaseGroup)
+                        }
                     }
                 }
 
@@ -98,6 +101,19 @@ struct Aggregator {
         } catch {
             print("Failed to generate statistics")
             print("Error: \(error)")
+        }
+    }
+
+    static func printMessage(disease: Disease, group: String) {
+        switch group {
+        case ORDO.obsoleteClinicalEntity.rawValue:
+            print("\(disease.preferredTerm) (ORPHA:\(disease.code)) is obsolete.")
+        case ORDO.nonRareClinicalEntity.rawValue:
+            print("\(disease.preferredTerm) (ORPHA:\(disease.code)) is not rare in Europe.")
+        case ORDO.deprecatedClinicalEntity.rawValue:
+            print("\(disease.preferredTerm) (ORPHA:\(disease.code)) is deprecated.")
+        default:
+            return
         }
     }
 
