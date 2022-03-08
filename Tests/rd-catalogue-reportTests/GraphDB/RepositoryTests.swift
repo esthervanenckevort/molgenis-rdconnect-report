@@ -15,14 +15,11 @@ import XCTest
 @testable import rd_catalogue_report
 
 class RepositoryTests: XCTestCase {
-    let disorderGroup = "http://www.orpha.net/ORDO/Orphanet_557492"
-    let clinicalEntity = "http://www.orpha.net/ORDO/Orphanet_C001"
-    let subClassOf = "http://www.w3.org/2000/01/rdf-schema#subClassOf"
-    let relations = [
-        "http://www.orpha.net/ORDO/Orphanet_C021", // partOf
-        "http://www.w3.org/2000/01/rdf-schema#subClassOf" // subClassOf
-    ]
     let repository = Repository(url: URL(string: "http://localhost:7200/")!, repository: "ordo")
+    let disease = "http://www.orpha.net/ORDO/Orphanet_85102"
+    let category = "http://www.orpha.net/ORDO/Orphanet_506207"
+    let headCategory = "http://www.orpha.net/ORDO/Orphanet_565779"
+    let obsoleteDisease = "http://www.orpha.net/ORDO/Orphanet_93956"
 
 
     override func setUpWithError() throws {
@@ -33,35 +30,30 @@ class RepositoryTests: XCTestCase {
         // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
-    func testDepthFirstSearch() async throws {
+    func testDiseaseToHead() async throws {
 
-        let results = try await repository.depthFirstSearch(starting: "http://www.orpha.net/ORDO/Orphanet_85102", direction: .outgoing) {
-            relations.contains($0.predicate)
-        } isMatch: { edges in
-            let groups = edges.filter { disorderGroup == $0.object.value }
-            guard !groups.isEmpty else { return false }
-            return groups.filter { $0.object.value != clinicalEntity && $0.object.value != disorderGroup }.isEmpty
-        }
-
+        let results = try await repository.depthFirstSearch(starting: disease, direction: .outgoing, shouldTraverse: ORDO.isSubClassOrPartOfRelationship, isMatch: ORDO.isMainCategory)
+        print(results)
         XCTAssertTrue(results.count > 0, "Results must be non-empty, actually \(results.count)")
-        XCTAssertTrue(results.count == 6, "Expected that this disease is part of seven disease groups, actually \(results.count)")
+        XCTAssertTrue(results.count == 2, "Expected that this disease is part of seven disease groups, actually \(results.count)")
 
     }
 
-    func testMatchOnHeadOnly() async throws {
+    func testGroupOfDisordersToHead() async throws {
 
-        let results = try await repository.depthFirstSearch(starting: "http://www.orpha.net/ORDO/Orphanet_506207", direction: .outgoing) {
-            relations.contains($0.predicate)
-        } isMatch: { edges in
-            guard edges.contains(where: { disorderGroup == $0.object.value }) else { return false }
-            let subclass = edges.filter { $0.predicate == subClassOf }
-            let isMatch = subclass.filter { $0.object.value != clinicalEntity && $0.object.value != disorderGroup }.isEmpty
-            print(isMatch)
-            return isMatch
-        }
+        let results = try await repository.depthFirstSearch(starting: category, direction: .outgoing, shouldTraverse: ORDO.isSubClassOrPartOfRelationship, isMatch: ORDO.isMainCategory)
 
         XCTAssertTrue(results.count == 1, "Must contain only one result, actually \(results)")
-        XCTAssertTrue(results.filter { $0 == "http://www.orpha.net/ORDO/Orphanet_565779" }.isEmpty == false , "Expected that this disease is part of Rare disorder potentially indicated for transplant or complication after transplantation, actually \(results)")
+        XCTAssertTrue(results.filter { $0 == headCategory }.isEmpty == false , "Expected that this disease is part of Rare disorder potentially indicated for transplant or complication after transplantation, actually \(results)")
+
+    }
+
+    func testObsoleteToHead() async throws {
+        let results = try await repository.depthFirstSearch(starting: obsoleteDisease, direction: .outgoing, shouldTraverse: ORDO.isSubClassOrPartOfRelationship, isMatch: ORDO.isMainCategory)
+
+        XCTAssertTrue(results.count == 1, "Must contain only one result, actually \(results)")
+        XCTAssertTrue(results.filter { $0 == ORDO.obsoleteClinicalEntity.rawValue }.isEmpty == false , "Expected that this disease is marked as an obsolete disease, actually \(results)")
+
 
     }
 

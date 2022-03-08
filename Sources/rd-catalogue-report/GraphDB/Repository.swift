@@ -104,6 +104,13 @@ public class Repository {
         return (iri, label?.value ?? labels.first?.value ?? "N/A")
     }
 
+    public func object(subject: String, predicate: String) async throws -> [String] {
+        let result = try await statements(subject: subject, predicate: predicate)
+        guard let value = result[subject] else { throw GraphDBError.decoding }
+        guard let objects = value[predicate] else { throw GraphDBError.decoding }
+        return objects.map { $0.value }
+    }
+
     private func statements(subject: String? = nil, predicate: String? = nil, object: String? = nil) async throws -> RDF_JSON {
         let statementsURL = url.appendingPathComponent("repositories").appendingPathComponent(repository).appendingPathComponent("statements")
         var statement = URLComponents(url: statementsURL, resolvingAgainstBaseURL: true)!
